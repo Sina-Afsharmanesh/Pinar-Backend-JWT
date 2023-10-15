@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	tokenMap sync.Map
-	secret   = []byte(`P0pogHm:{"Rp%&%>~vSfY]-;7Uzlxq`)
+	tokenMap      sync.Map
+	cacheTokenMap sync.Map
+	secret        = []byte(`P0pogHm:{"Rp%&%>~vSfY]-;7Uzlxq`)
 )
 
 func generate(c echo.Context) error {
@@ -53,20 +54,25 @@ func verify(c echo.Context) error {
 	authHeader := c.Request().Header.Get("Authorization")
 	if authHeader == "" {
 		log.ServLogger.Error("verify - authHeader is empty")
-		return c.NoContent(echo.ErrUnauthorized.Code)
+		return c.String(echo.ErrUnauthorized.Code, "Authorization is empty")
 	}
 
 	parts := strings.Split(authHeader, " ")
 	if len(parts) != 2 || parts[0] != "Bearer" {
-		return c.NoContent(echo.ErrBadRequest.Code)
+		return c.String(echo.ErrBadRequest.Code, "Authorization is not Bearer")
 	}
 
 	tokenString := parts[1]
 
-	if load, ok := tokenMap.Load(id); ok {
+	if load, ok := cacheTokenMap.Load(id); ok {
 		if load.(string) == tokenString {
 			return c.NoContent(200)
 		}
+	}
+
+	if _, ok := tokenMap.Load(id); !ok {
+		log.ServLogger.Error("verify - token not found")
+		return c.String(echo.ErrUnauthorized.Code, "token not found")
 	}
 
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
@@ -86,18 +92,29 @@ func verify(c echo.Context) error {
 		return c.String(http.StatusUnauthorized, "Invalid token")
 	}
 
+	cacheTokenMap.Store(id, tokenString)
+
 	return c.NoContent(http.StatusOK)
 
 }
 
-func refresh(c echo.Context) error {
-
-}
-
 func revoke(c echo.Context) error {
+	id := c.Param("id")
+	authHeader := c.Request().Header.Get("Authorization")
+	if authHeader == "" {
+		log.ServLogger.Error("revoke - authHeader is empty")
+		return c.String(echo.ErrUnauthorized.Code, "Authorization header is empty")
+	}
 
-}
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return c.String(echo.ErrBadRequest.Code, "Authorization is not Bearer")
+	}
 
-func revokeAll(c echo.Context) error {
+	if load, ok := tokenMap.LoadAndDelete(id); ok {
+		cacheTokenMap.Delete(id)
+		log.ServLogger.Info("revoke - removed token: " + load.(string))
+	}
 
+	return c.NoContent(200)
 }
