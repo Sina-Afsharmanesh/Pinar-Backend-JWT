@@ -18,6 +18,11 @@ var (
 	secret        = []byte(`P0pogHm:{"Rp%&%>~vSfY]-;7Uzlxq`)
 )
 
+func authorize(c echo.Context) error {
+	//todo: fetch user role from database, see if it matches the target table and the permission if it does, pass the request
+	return c.NoContent(200)
+}
+
 func generate(c echo.Context) error {
 	var user User
 	if err := c.Bind(&user); err != nil {
