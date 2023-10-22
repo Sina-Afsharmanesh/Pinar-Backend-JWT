@@ -33,5 +33,5 @@ func main() {
 		exit()
 	}()
 
-	httpLocal.HttpServer.Logger.Fatal(httpLocal.HttpServer.Start(":8443"))
+	httpLocal.HttpServer.Logger.Fatal(httpLocal.HttpServer.Start(":7000"))
 }
