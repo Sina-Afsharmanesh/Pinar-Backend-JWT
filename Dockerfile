@@ -1,13 +1,11 @@
 FROM golang AS builder
-RUN apt update && apt upgrade
-ENV $GOPATH=/usr/local/go/src
-WORKDIR $GOPATH/app
+WORKDIR $GOPATH/src/package/app/
 COPY . .
-
+RUN go mod download
 RUN go get -d -v
 RUN go install
-RUN go build -o /go/bin/main
+RUN CGO_ENABLED=0 GOOS=linux go build -o /go/bin/main
 FROM scratch
-
-COPY --from=builder /go/bin/main /go/bin/main
-ENTRYPOINT ["/go/bin/main"]
+COPY --from=builder /go/bin/main main
+EXPOSE 7000
+ENTRYPOINT ["/main"]

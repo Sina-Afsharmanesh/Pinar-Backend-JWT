@@ -1,6 +1,8 @@
 package token
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
 	"errors"
 	"net/http"
 	"strings"
@@ -15,15 +17,15 @@ import (
 var (
 	tokenMap      sync.Map
 	cacheTokenMap sync.Map
-	secret        = []byte(`P0pogHm:{"Rp%&%>~vSfY]-;7Uzlxq`)
+	_, secret, _  = ed25519.GenerateKey(rand.Reader)
 )
 
-func authorize(c echo.Context) error {
+func Authorize(c echo.Context) error {
 	//todo: fetch user role from database, see if it matches the target table and the permission if it does, pass the request
 	return c.NoContent(200)
 }
 
-func generate(c echo.Context) error {
+func Generate(c echo.Context) error {
 	var user User
 	if err := c.Bind(&user); err != nil {
 		return c.NoContent(echo.ErrBadRequest.Code)
@@ -54,7 +56,7 @@ func generate(c echo.Context) error {
 	return c.String(200, tokenString)
 }
 
-func verify(c echo.Context) error {
+func Verify(c echo.Context) error {
 	id := c.Param("id")
 	authHeader := c.Request().Header.Get("Authorization")
 	if authHeader == "" {
@@ -103,7 +105,7 @@ func verify(c echo.Context) error {
 
 }
 
-func revoke(c echo.Context) error {
+func Revoke(c echo.Context) error {
 	id := c.Param("id")
 	authHeader := c.Request().Header.Get("Authorization")
 	if authHeader == "" {
