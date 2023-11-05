@@ -37,5 +37,6 @@ func main() {
 	httpLocal.HttpServer.POST("/authorize", token.Authorize)
 	httpLocal.HttpServer.POST("/verify", token.Verify)
 	httpLocal.HttpServer.POST("/revoke", token.Revoke)
+	httpLocal.HttpServer.POST("/getclaims", token.GetClaims)
 	httpLocal.HttpServer.Logger.Fatal(httpLocal.HttpServer.Start(":7050"))
 }
