@@ -2,13 +2,13 @@ package main
 
 import (
 	"context"
+	"jwt/httpLocal"
+	"jwt/log"
+	token "jwt/token"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
-	"template/httpLocal"
-	"template/log"
-	token "template/token"
 
 	_ "go.uber.org/automaxprocs"
 )

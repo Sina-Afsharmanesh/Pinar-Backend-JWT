@@ -3,11 +3,13 @@ package token
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"jwt/log"
 	"net/http"
 	"strings"
 	"sync"
-	"template/log"
 	"time"
 
 	"github.com/golang-jwt/jwt"
@@ -27,13 +29,14 @@ func Authorize(c echo.Context) error {
 
 func Generate(c echo.Context) error {
 	var user User
-	if err := c.Bind(&user); err != nil {
+	if err := json.NewDecoder(c.Request().Body).Decode(&user); err != nil {
+		log.ServLogger.Error("generate - user: " + err.Error())
 		return c.NoContent(echo.ErrBadRequest.Code)
 	}
-	log.ServLogger.Info("generate - user: " + user.Id.String())
+	log.ServLogger.Info("generate - user: " + user.Id)
 
 	claims := jwt.MapClaims{
-		"sub":  user.Id.String(),
+		"sub":  user.Id,
 		"name": user.Name,
 		"role": user.Role,
 		"iss":  "PinatJwtService",
@@ -51,7 +54,7 @@ func Generate(c echo.Context) error {
 	}
 	log.ServLogger.Info("generate - tokenString: " + tokenString)
 
-	tokenMap.Store(user.Id.String(), tokenString)
+	tokenMap.Store(user.Id, tokenString)
 
 	return c.String(200, tokenString)
 }
@@ -102,15 +105,34 @@ func Verify(c echo.Context) error {
 	cacheTokenMap.Store(id, tokenString)
 
 	return c.NoContent(http.StatusOK)
-
 }
 
 func Revoke(c echo.Context) error {
 	id := c.Param("id")
 	authHeader := c.Request().Header.Get("Authorization")
 	if authHeader == "" {
-		log.ServLogger.Error("revoke - authHeader is empty")
+		log.ErrLogger.Error("revoke - authHeader is empty")
 		return c.String(echo.ErrUnauthorized.Code, "Authorization header is empty")
+	}
+
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return c.String(echo.ErrBadRequest.Code, "Authorization header is not Bearer")
+	}
+
+	if load, ok := tokenMap.LoadAndDelete(id); ok {
+		cacheTokenMap.Delete(id)
+		log.ErrLogger.Info("revoke - removed token: " + load.(string))
+	}
+
+	return c.NoContent(200)
+}
+
+func GetClaims(c echo.Context) error {
+	authHeader := c.Request().Header.Get("Authorization")
+	if authHeader == "" {
+		log.ServLogger.Error("GetClaims - authHeader is empty")
+		return c.String(echo.ErrUnauthorized.Code, "Authorization is empty")
 	}
 
 	parts := strings.Split(authHeader, " ")
@@ -118,10 +140,29 @@ func Revoke(c echo.Context) error {
 		return c.String(echo.ErrBadRequest.Code, "Authorization is not Bearer")
 	}
 
-	if load, ok := tokenMap.LoadAndDelete(id); ok {
-		cacheTokenMap.Delete(id)
-		log.ServLogger.Info("revoke - removed token: " + load.(string))
+	tokenString := parts[1]
+
+	token, _, err := new(jwt.Parser).ParseUnverified(tokenString, jwt.MapClaims{})
+	if err != nil {
+		log.ErrLogger.Error("GetClaims - error parsing claims " + err.Error())
+		return c.String(echo.ErrBadRequest.Code, err.Error())
 	}
 
-	return c.NoContent(200)
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		log.ErrLogger.Error("GetClaims - error mapping claims " + err.Error())
+		return c.String(echo.ErrInternalServerError.Code, err.Error())
+	}
+
+	id := fmt.Sprint(claims["sub"])
+	name := fmt.Sprint(claims["name"])
+	role := fmt.Sprint(claims["role"])
+
+	result := User{
+		Id:   id,
+		Name: name,
+		Role: role,
+	}
+
+	return c.JSON(200, result)
 }

@@ -1,4 +1,4 @@
-module template
+module jwt
 
 go 1.21.1
 
